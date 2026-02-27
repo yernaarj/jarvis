@@ -75,7 +75,8 @@ async def get_status():
         "speech_recognizer": speech_recognizer is not None,
         "tts": tts is not None,
         "ready": speech_recognizer is not None and tts is not None,
-        "mode": "mock (без аудио)"
+        "microphone_available": speech_recognizer.is_available() if speech_recognizer else False,
+        "tts_available": tts.is_available() if tts else False
     }
 
 
@@ -86,6 +87,52 @@ async def test_tts(text: str = "Привет, я Джарвис!"):
         success = tts.speak(text)
         return {"success": success, "text": text}
     return {"success": False, "error": "TTS not initialized"}
+
+
+@app.get("/api/test-microphone")
+async def test_microphone():
+    """Тест микрофона - скажите что-нибудь"""
+    if not speech_recognizer:
+        return {"error": "Speech recognizer not initialized"}
+    
+    if not speech_recognizer.is_available():
+        from core.speech import is_wsl
+        return {"error": "Microphone not available", "wsl": is_wsl()}
+    
+    logger.info("🎤 Тест микрофона - говорите...")
+    text = speech_recognizer.listen(timeout=5)
+    
+    return {
+        "success": text is not None,
+        "recognized_text": text,
+        "message": "Микрофон работает!" if text else "Не удалось распознать"
+    }
+
+
+@app.post("/api/voice-command")
+async def voice_command():
+    """Слушает голосовую команду через микрофон"""
+    if not speech_recognizer or not speech_recognizer.is_available():
+        return {
+            "success": False,
+            "error": "Микрофон недоступен. Запустите проект в Windows или используйте /api/command"
+        }
+    
+    # Слушаем команду
+    logger.info("🎤 Ожидание голосовой команды...")
+    text = speech_recognizer.listen(timeout=10, phrase_time_limit=10)
+    
+    if not text:
+        return {
+            "success": False,
+            "error": "Не удалось распознать команду"
+        }
+    
+    # Обрабатываем как обычную команду
+    cmd = CommandRequest(text=text)
+    response = await process_command(cmd)
+    
+    return response
 
 
 @app.post("/api/command", response_model=CommandResponse)
@@ -220,6 +267,51 @@ async def process_command(cmd: CommandRequest):
         original_text=cmd.text
     )
 
+from fastapi import UploadFile, File
+import tempfile
+import os
+
+@app.post("/api/audio-command")
+async def audio_command(audio: UploadFile = File(...)):
+    """Принимает аудио файл, распознаёт и выполняет команду"""
+    if not speech_recognizer:
+        return {"success": False, "error": "Speech recognizer not initialized"}
+    
+    temp_path = None
+    try:
+        # Сохраняем временный файл
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
+            content = await audio.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        
+        logger.info(f"📥 Получен аудио файл")
+        
+        # Распознаём через SpeechRecognition
+        import speech_recognition as sr
+        recognizer = sr.Recognizer()
+        
+        with sr.AudioFile(temp_path) as source:
+            audio_data = recognizer.record(source)
+            text = recognizer.recognize_google(audio_data, language=settings.SPEECH_LANGUAGE)
+        
+        os.unlink(temp_path)
+        logger.info(f"✅ Распознано: {text}")
+        
+        # Обрабатываем команду
+        cmd = CommandRequest(text=text.lower())
+        response = await process_command(cmd)
+        return response
+        
+    except sr.UnknownValueError:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        return {"success": False, "error": "Не удалось распознать речь"}
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        logger.error(f"❌ Ошибка: {e}")
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
