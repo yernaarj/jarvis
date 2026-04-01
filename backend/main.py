@@ -188,7 +188,7 @@ async def process_command(cmd: CommandRequest):
         response_text = "Запускаю Discord..." if success else "Не удалось запустить Discord"
         
     elif parsed['type'] == 'app_telegram':
-        success = open_application('telegram')
+        success = open_application('Telegram')
         response_text = "Запускаю Telegram..." if success else "Не удалось запустить Telegram"
         
     elif parsed['type'] == 'app_spotify':
@@ -246,6 +246,11 @@ async def process_command(cmd: CommandRequest):
         # success = shutdown_pc()
         # response_text = "Выключаю компьютер..." if success else "Не удалось выключить"
     
+    # Признание
+    elif parsed['type'] == 'aizhan_message':
+        response_text = "Я люблю тебя Солнышко"
+        success = True
+
     # Выход
     elif parsed['type'] == 'exit':
         response_text = "До свидания!"

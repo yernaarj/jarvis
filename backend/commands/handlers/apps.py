@@ -34,7 +34,15 @@ def open_application(app_name: str):
             'linux': 'discord'
         },
         'telegram': {
-            'windows': 'telegram',
+            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
+            'linux': 'telegram-desktop'
+        },
+        'телеграм': {
+            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
+            'linux': 'telegram-desktop'
+        },
+        'телеграмм': {
+            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
             'linux': 'telegram-desktop'
         },
         'spotify': {
@@ -77,10 +85,9 @@ def open_application(app_name: str):
         if is_wsl():
             # Запускаем через Windows из WSL
             cmd = apps[app_name_lower]['windows']
-            # Расширяем переменные окружения
-            cmd = os.path.expandvars(cmd)
-            subprocess.Popen(['cmd.exe', '/c', 'start', '', cmd], 
-                           stdout=subprocess.DEVNULL, 
+            # Раскрываем Windows переменные окружения через cmd.exe
+            subprocess.Popen(['cmd.exe', '/c', 'start', '', cmd],
+                           stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
             logger.info(f"✅ Приложение {app_name} запущено (WSL)")
             return True
