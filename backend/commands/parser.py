@@ -32,6 +32,9 @@ class CommandParser:
             
             # Выход
             'exit': r'(выход|стоп|хватит|закрой|выключись)',
+
+            # Признание
+            'aizhan_message': r'айжан.*(хочу тебе сказать|хочу сказать)',
         }
     
     def parse(self, text: str) -> Dict[str, Any]:
