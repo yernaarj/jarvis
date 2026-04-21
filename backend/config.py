@@ -16,6 +16,20 @@ class Settings(BaseSettings):
     # Пути
     LOG_FILE: str = "logs/jarvis.log"
     
+    # Внешние API
+    OPENWEATHER_API_KEY: str = ""
+
+    # Semantic Search
+    SEARCH_INDEX_PATH: str = "search/index"
+    SEARCH_MODEL_NAME: str = "intfloat/multilingual-e5-small"
+    SEARCH_DIRS: list = [
+        "/mnt/c/Users/user/Desktop",
+        "/mnt/c/Users/user/Downloads",
+        "/mnt/c/Users/user/Documents",
+    ]
+    SEARCH_MAX_RESULTS: int = 10
+    SEARCH_CHUNK_SIZE: int = 512
+
     # Режим работы
     DEBUG: bool = True
     

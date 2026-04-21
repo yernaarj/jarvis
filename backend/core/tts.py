@@ -88,7 +88,7 @@ class TextToSpeech:
                     subprocess.run(
                         ['powershell.exe', '-Command', ps_command],
                         capture_output=True,
-                        timeout=10
+                        timeout=120
                     )
                     return True
                 except Exception as e:

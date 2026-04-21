@@ -6,6 +6,9 @@ class CommandParser:
     def __init__(self):
         # Паттерны команд
         self.patterns = {
+            # Поиск файлов — должен быть ВЫШЕ 'search' и 'browser'
+            'file_search': r'(найди|поиск|где|открой)\s+(файл|документ|папку)\s*(.+)',
+
             # Браузер и поиск
             'browser': r'(открой|запусти|включи).*(браузер|chrome|firefox)',
             'search': r'(найди|поищи|гугл|google|search)\s+(.+)',
@@ -14,8 +17,7 @@ class CommandParser:
             # Приложения
             'app_vscode': r'(открой|запусти|включи).*(vscode|code|visual studio code|vs code)',
             'app_discord': r'(открой|запусти|включи).*(discord|дискорд)',
-            'app_telegram': r'(открой|запусти|включи).*(telegram|телеграм)',
-            'app_spotify': r'(открой|запусти|включи).*(spotify|спотифай)',
+'app_spotify': r'(открой|запусти|включи).*(spotify|спотифай)',
             'app_notepad': r'(открой|запусти|включи).*(notepad|блокнот)',
             'app_calc': r'(открой|запусти|включи).*(калькулятор|calculator|calc)',
             'app_explorer': r'(открой|запусти|включи).*(проводник|explorer|папк)',
@@ -33,8 +35,17 @@ class CommandParser:
             # Выход
             'exit': r'(выход|стоп|хватит|закрой|выключись)',
 
+            # Погода
+            'weather': r'(какая погода|погода|как погода)(\s+в\s+(.+))?',
+
+            # Столица Колумбии
+            'capital_colombia': r'столица колумбии',
+
             # Признание
             'aizhan_message': r'айжан.*(хочу тебе сказать|хочу сказать)',
+
+            # Сообщение для Айнуры
+            'ainura_message': r'сообщение для айнуры',
         }
     
     def parse(self, text: str) -> Dict[str, Any]:

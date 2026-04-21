@@ -33,19 +33,7 @@ def open_application(app_name: str):
             'windows': r'C:\Users\%USERNAME%\AppData\Local\Discord\Update.exe --processStart Discord.exe',
             'linux': 'discord'
         },
-        'telegram': {
-            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
-            'linux': 'telegram-desktop'
-        },
-        'телеграм': {
-            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
-            'linux': 'telegram-desktop'
-        },
-        'телеграмм': {
-            'windows': r'C:\Users\%USERNAME%\AppData\Roaming\Telegram Desktop\Telegram.exe',
-            'linux': 'telegram-desktop'
-        },
-        'spotify': {
+'spotify': {
             'windows': 'spotify',
             'linux': 'spotify'
         },
