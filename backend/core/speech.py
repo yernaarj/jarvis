@@ -1,20 +1,10 @@
 import speech_recognition as sr
 from typing import Optional
 import logging
-import platform
-import subprocess
+
+from core.platform import SYSTEM
 
 logger = logging.getLogger(__name__)
-
-
-def is_wsl():
-    """Проверяет запущен ли код в WSL"""
-    try:
-        with open('/proc/version', 'r') as f:
-            content = f.read().lower()
-            return 'microsoft' in content or 'wsl' in content
-    except:
-        return False
 
 
 class SpeechRecognizer:
@@ -22,73 +12,60 @@ class SpeechRecognizer:
         self.recognizer = sr.Recognizer()
         self.language = language
         self.microphone = None
-        
+        self._init_microphone()
+
+    def _init_microphone(self):
+        # ── CP-27/28/29 — микрофон на всех платформах ─────────────────────
+        if SYSTEM == 'wsl':
+            # WSL не имеет прямого доступа к микрофону
+            logger.warning("WSL: микрофон недоступен, используйте /api/command")
+            return
+
+        # Windows, Linux, macOS — прямой доступ
         try:
-            # Пытаемся инициализировать микрофон
             logger.info("Инициализация микрофона...")
-            
-            if is_wsl():
-                # В WSL микрофон может быть недоступен напрямую
-                logger.warning("WSL обнаружен. Микрофон может быть недоступен.")
-                logger.info("Для полноценной работы запустите проект в Windows или используйте API /api/command")
-                self.microphone = None
-            else:
-                # Прямой доступ к микрофону (Windows/Linux)
-                self.microphone = sr.Microphone()
-                
-                # Калибровка микрофона
-                with self.microphone as source:
-                    logger.info("Калибровка микрофона (подождите 2 секунды)...")
-                    self.recognizer.adjust_for_ambient_noise(source, duration=2)
-                    logger.info("✅ Микрофон готов!")
-                    
+            self.microphone = sr.Microphone()
+            with self.microphone as source:
+                logger.info("Калибровка микрофона (2 сек)...")
+                self.recognizer.adjust_for_ambient_noise(source, duration=2)
+            logger.info(f"✅ Микрофон готов ({SYSTEM})")
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось инициализировать микрофон: {e}")
-            logger.info("Будет доступен только режим через API")
+            # ── CP-30 — fallback: только API режим ────────────────────────
+            logger.warning(f"⚠️ Микрофон недоступен: {e}")
+            logger.info("Доступен только режим через /api/command")
             self.microphone = None
-    
+
     def listen(self, timeout: int = 5, phrase_time_limit: int = 10) -> Optional[str]:
-        """Слушает команду через микрофон"""
         if not self.microphone:
-            logger.error("Микрофон не инициализирован. Используйте API /api/command")
+            logger.error("Микрофон не инициализирован")
             return None
-            
+
         try:
             with self.microphone as source:
-                logger.info("🎤 Слушаю... (говорите сейчас)")
-                
-                # Слушаем аудио
+                logger.info("🎤 Слушаю...")
                 audio = self.recognizer.listen(
-                    source, 
-                    timeout=timeout, 
+                    source,
+                    timeout=timeout,
                     phrase_time_limit=phrase_time_limit
                 )
-                
+
             logger.info("📡 Распознаю речь...")
-            
-            # Распознаем через Google Speech API
             text = self.recognizer.recognize_google(audio, language=self.language)
-            
             logger.info(f"✅ Распознано: {text}")
             return text.lower()
-            
+
         except sr.WaitTimeoutError:
-            logger.warning("⏱️ Тайм-аут: не услышал команду")
+            logger.warning("⏱️ Тайм-аут")
             return None
-            
         except sr.UnknownValueError:
-            logger.warning("❓ Не удалось распознать речь (говорите четче)")
+            logger.warning("❓ Не удалось распознать речь")
             return None
-            
         except sr.RequestError as e:
-            logger.error(f"❌ Ошибка сервиса распознавания: {e}")
-            logger.info("Проверьте подключение к интернету")
+            logger.error(f"❌ Ошибка сервиса: {e}")
             return None
-            
         except Exception as e:
-            logger.error(f"❌ Неожиданная ошибка: {e}")
+            logger.error(f"❌ Ошибка: {e}")
             return None
-    
+
     def is_available(self) -> bool:
-        """Проверяет доступен ли микрофон"""
         return self.microphone is not None

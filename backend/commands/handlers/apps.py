@@ -1,128 +1,153 @@
 import subprocess
 import logging
 import os
-import platform
+
+from core.platform import SYSTEM, is_wsl, is_windows, is_linux, is_macos, get_home_dir
 
 logger = logging.getLogger(__name__)
 
+# ── CP-04/05/06/07 — Словарь приложений под каждую платформу ──────────────
+APPS = {
+    'vscode': {
+        'windows': 'code',
+        'wsl':     'code',
+        'linux':   'code',
+        'macos':   'code',
+    },
+    'code': {
+        'windows': 'code',
+        'wsl':     'code',
+        'linux':   'code',
+        'macos':   'code',
+    },
+    'discord': {
+        'windows': r'C:\Users\%USERNAME%\AppData\Local\Discord\Update.exe --processStart Discord.exe',
+        'wsl':     r'C:\Users\%USERNAME%\AppData\Local\Discord\Update.exe --processStart Discord.exe',
+        'linux':   'discord',
+        'macos':   'Discord',
+    },
+    'spotify': {
+        'windows': 'spotify',
+        'wsl':     'spotify',
+        'linux':   'spotify',
+        'macos':   'Spotify',
+    },
+    'notepad': {
+        'windows': 'notepad',
+        'wsl':     'notepad.exe',
+        'linux':   'gedit',
+        'macos':   'TextEdit',
+    },
+    'блокнот': {
+        'windows': 'notepad',
+        'wsl':     'notepad.exe',
+        'linux':   'gedit',
+        'macos':   'TextEdit',
+    },
+    'калькулятор': {
+        'windows': 'calc',
+        'wsl':     'calc.exe',
+        'linux':   'gnome-calculator',
+        'macos':   'Calculator',
+    },
+    'calculator': {
+        'windows': 'calc',
+        'wsl':     'calc.exe',
+        'linux':   'gnome-calculator',
+        'macos':   'Calculator',
+    },
+    'проводник': {
+        'windows': 'explorer',
+        'wsl':     'explorer.exe',
+        'linux':   'nautilus',
+        'macos':   'Finder',
+    },
+    'explorer': {
+        'windows': 'explorer',
+        'wsl':     'explorer.exe',
+        'linux':   'nautilus',
+        'macos':   'Finder',
+    },
+}
 
-def is_wsl():
-    """Проверяет запущен ли код в WSL"""
-    try:
-        with open('/proc/version', 'r') as f:
-            content = f.read().lower()
-            return 'microsoft' in content or 'wsl' in content
-    except:
-        return False
 
-
-def open_application(app_name: str):
-    """Открывает приложение по имени"""
-    
-    # Словарь приложений и их путей/команд
-    apps = {
-        'vscode': {
-            'windows': 'code',
-            'linux': 'code'
-        },
-        'code': {
-            'windows': 'code',
-            'linux': 'code'
-        },
-        'discord': {
-            'windows': r'C:\Users\%USERNAME%\AppData\Local\Discord\Update.exe --processStart Discord.exe',
-            'linux': 'discord'
-        },
-'spotify': {
-            'windows': 'spotify',
-            'linux': 'spotify'
-        },
-        'notepad': {
-            'windows': 'notepad',
-            'linux': 'gedit'
-        },
-        'блокнот': {
-            'windows': 'notepad',
-            'linux': 'gedit'
-        },
-        'калькулятор': {
-            'windows': 'calc',
-            'linux': 'gnome-calculator'
-        },
-        'calculator': {
-            'windows': 'calc',
-            'linux': 'gnome-calculator'
-        },
-        'проводник': {
-            'windows': 'explorer',
-            'linux': 'nautilus'
-        },
-        'explorer': {
-            'windows': 'explorer',
-            'linux': 'nautilus'
-        }
-    }
-    
+def open_application(app_name: str) -> bool:
+    """Открывает приложение по имени — кросс-платформенно"""
     app_name_lower = app_name.lower()
-    
-    if app_name_lower not in apps:
+
+    if app_name_lower not in APPS:
         logger.warning(f"Приложение '{app_name}' не найдено в списке")
         return False
-    
+
+    cmd = APPS[app_name_lower].get(SYSTEM)
+    if not cmd:
+        logger.warning(f"Приложение '{app_name}' не поддерживается на {SYSTEM}")
+        return False
+
     try:
-        if is_wsl():
-            # Запускаем через Windows из WSL
-            cmd = apps[app_name_lower]['windows']
-            # Раскрываем Windows переменные окружения через cmd.exe
+        # ── CP-04 — Windows нативно ────────────────────────────────────────
+        if SYSTEM == 'windows':
+            subprocess.Popen(cmd, shell=True,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        # ── WSL — запускаем Windows приложение через cmd.exe ───────────────
+        elif SYSTEM == 'wsl':
             subprocess.Popen(['cmd.exe', '/c', 'start', '', cmd],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
-            logger.info(f"✅ Приложение {app_name} запущено (WSL)")
-            return True
-        else:
-            # Нативный запуск
-            system = platform.system()
-            cmd = apps[app_name_lower].get('windows' if system == 'Windows' else 'linux')
-            
-            if system == 'Windows':
-                subprocess.Popen(cmd, shell=True)
-            else:
-                subprocess.Popen(cmd.split())
-            
-            logger.info(f"✅ Приложение {app_name} запущено")
-            return True
-            
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        # ── CP-05 — Linux ──────────────────────────────────────────────────
+        elif SYSTEM == 'linux':
+            subprocess.Popen(cmd.split(),
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        # ── CP-06 — macOS ──────────────────────────────────────────────────
+        elif SYSTEM == 'macos':
+            subprocess.Popen(['open', '-a', cmd],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        logger.info(f"✅ Приложение {app_name} запущено ({SYSTEM})")
+        return True
+
     except Exception as e:
         logger.error(f"❌ Ошибка запуска приложения {app_name}: {e}")
         return False
 
 
-def open_folder(path: str = None):
-    """Открывает папку в проводнике"""
+def open_folder(path: str = None) -> bool:
+    """Открывает папку в проводнике — кросс-платформенно"""
     try:
         if path is None:
-            # Открываем домашнюю папку
-            if is_wsl():
-                path = '/mnt/c/Users'
-            else:
-                path = os.path.expanduser('~')
-        
-        if is_wsl():
-            # Конвертируем WSL путь в Windows путь если нужно
+            path = get_home_dir()
+
+        if SYSTEM == 'wsl':
             if path.startswith('/mnt/c'):
                 windows_path = path.replace('/mnt/c', 'C:', 1).replace('/', '\\')
             else:
                 windows_path = path
-            
-            subprocess.run(['explorer.exe', windows_path], check=True)
-        else:
-            if platform.system() == 'Windows':
-                os.startfile(path)
-            else:
-                subprocess.run(['xdg-open', path])
-        
+            subprocess.Popen(['explorer.exe', windows_path],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        elif SYSTEM == 'windows':
+            os.startfile(path)
+
+        elif SYSTEM == 'linux':
+            subprocess.Popen(['xdg-open', path],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+        elif SYSTEM == 'macos':
+            subprocess.Popen(['open', path],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
         logger.info(f"✅ Папка открыта: {path}")
         return True
+
     except Exception as e:
         logger.error(f"❌ Ошибка открытия папки: {e}")
         return False

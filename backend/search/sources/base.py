@@ -9,6 +9,7 @@ class FileInfo:
     name: str      # имя файла
     source: str    # название источника: 'local', 'google_drive', etc.
     modified_at: float  # timestamp последнего изменения
+    size: int = 0  # размер файла в байтах (DJ-37)
 
 
 class BaseSource(ABC):
