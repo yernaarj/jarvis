@@ -1,102 +1,102 @@
-import pyttsx3
+import subprocess
 import logging
-from typing import Optional
-import platform
+
+from core.platform import SYSTEM
 
 logger = logging.getLogger(__name__)
 
 
-def is_wsl():
-    """Проверяет запущен ли код в WSL"""
-    try:
-        with open('/proc/version', 'r') as f:
-            content = f.read().lower()
-            return 'microsoft' in content or 'wsl' in content
-    except:
-        return False
-
-
 class TextToSpeech:
     def __init__(self, rate: int = 150, volume: float = 0.9):
+        self.rate = rate
+        self.volume = volume
         self.engine = None
-        self.wsl_mode = is_wsl()
-        
+        self._init_engine()
+
+    def _init_engine(self):
+        # ── CP-23 — Windows нативно ───────────────────────────────────────
+        if SYSTEM == 'windows':
+            self._init_pyttsx3()
+
+        # ── WSL — PowerShell TTS ──────────────────────────────────────────
+        elif SYSTEM == 'wsl':
+            logger.info("WSL: используем PowerShell TTS")
+
+        # ── CP-24 — Linux ─────────────────────────────────────────────────
+        elif SYSTEM == 'linux':
+            self._init_pyttsx3(fallback='espeak')
+
+        # ── CP-25 — macOS ─────────────────────────────────────────────────
+        elif SYSTEM == 'macos':
+            self._init_pyttsx3(fallback='say')
+
+    def _init_pyttsx3(self, fallback: str = None):
         try:
-            if self.wsl_mode:
-                logger.warning("WSL обнаружен. TTS может работать нестабильно.")
-                logger.info("Для лучшего качества запустите проект в Windows")
-                # В WSL используем консольный вывод + можно попробовать Windows TTS
-                self.engine = None
+            import pyttsx3
+            self.engine = pyttsx3.init()
+            self.engine.setProperty('rate', self.rate)
+            self.engine.setProperty('volume', self.volume)
+
+            # Ищем русский голос
+            for voice in self.engine.getProperty('voices'):
+                if any(x in voice.name.lower() for x in ['russian', 'ru_ru', 'ru-ru', 'elena', 'irina']):
+                    self.engine.setProperty('voice', voice.id)
+                    logger.info(f"✅ TTS голос: {voice.name}")
+                    break
             else:
-                # Инициализируем pyttsx3
-                logger.info("Инициализация TTS...")
-                self.engine = pyttsx3.init()
-                
-                # Настройка скорости речи
-                self.engine.setProperty('rate', rate)
-                
-                # Настройка громкости (0.0 - 1.0)
-                self.engine.setProperty('volume', volume)
-                
-                # Пытаемся найти русский голос
-                voices = self.engine.getProperty('voices')
-                russian_voice = None
-                
-                for voice in voices:
-                    # Проверяем разные варианты русских голосов
-                    if any(x in voice.name.lower() for x in ['russian', 'ru_ru', 'ru-ru', 'elena', 'irina']):
-                        russian_voice = voice.id
-                        logger.info(f"✅ Найден русский голос: {voice.name}")
-                        break
-                
-                if russian_voice:
-                    self.engine.setProperty('voice', russian_voice)
-                else:
-                    logger.warning("⚠️ Русский голос не найден, используется голос по умолчанию")
-                
-                logger.info("✅ TTS инициализирован успешно")
-                
+                logger.warning("⚠️ Русский голос не найден, используется голос по умолчанию")
+
+            logger.info(f"✅ TTS инициализирован (pyttsx3, {SYSTEM})")
         except Exception as e:
-            logger.error(f"❌ Ошибка инициализации TTS: {e}")
-            logger.info("Будет использоваться текстовый вывод в консоль")
-            self.engine = None
-    
+            logger.warning(f"⚠️ pyttsx3 недоступен: {e}")
+            if fallback:
+                logger.info(f"Используем fallback: {fallback}")
+                self.engine = None
+                self._fallback = fallback
+
     def speak(self, text: str) -> bool:
-        """Произносит текст голосом"""
-        # Всегда выводим в консоль (для логов)
         logger.info(f"🔊 JARVIS: {text}")
         print(f"\n🤖 JARVIS: {text}\n")
-        
-        # Если TTS доступен - говорим вслух
-        if self.engine:
-            try:
+
+        try:
+            if self.engine:
                 self.engine.say(text)
                 self.engine.runAndWait()
                 return True
-            except Exception as e:
-                logger.error(f"❌ Ошибка озвучивания: {e}")
-                return False
-        else:
-            # В WSL или если TTS недоступен - только текст
-            if self.wsl_mode:
-                # Можно попробовать вызвать Windows TTS через PowerShell
-                try:
-                    import subprocess
-                    # Экранируем кавычки в тексте
-                    safe_text = text.replace('"', '""')
-                    ps_command = f'Add-Type -AssemblyName System.Speech; $speak = New-Object System.Speech.Synthesis.SpeechSynthesizer; $speak.Speak("{safe_text}")'
-                    subprocess.run(
-                        ['powershell.exe', '-Command', ps_command],
-                        capture_output=True,
-                        timeout=120
-                    )
-                    return True
-                except Exception as e:
-                    logger.debug(f"Windows TTS через PowerShell недоступен: {e}")
-                    return False
-            
-            return False
-    
+
+            # ── WSL — PowerShell ──────────────────────────────────────────
+            elif SYSTEM == 'wsl':
+                safe_text = text.replace('"', '""')
+                cmd = (f'Add-Type -AssemblyName System.Speech; '
+                       f'$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; '
+                       f'$s.Speak("{safe_text}")')
+                subprocess.run(['powershell.exe', '-Command', cmd],
+                               capture_output=True, timeout=120)
+                return True
+
+            # ── Linux fallback — espeak ───────────────────────────────────
+            elif SYSTEM == 'linux' and getattr(self, '_fallback', None) == 'espeak':
+                subprocess.run(['espeak', '-v', 'ru', text],
+                               capture_output=True, timeout=30)
+                return True
+
+            # ── macOS fallback — say ──────────────────────────────────────
+            elif SYSTEM == 'macos' and getattr(self, '_fallback', None) == 'say':
+                subprocess.run(['say', text], capture_output=True, timeout=30)
+                return True
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка TTS: {e}")
+
+        return False
+
     def is_available(self) -> bool:
-        """Проверяет доступен ли TTS"""
-        return self.engine is not None
+        if self.engine:
+            return True
+        if SYSTEM == 'wsl':
+            return True
+        if SYSTEM == 'linux' and getattr(self, '_fallback', None) == 'espeak':
+            return True
+        if SYSTEM == 'macos' and getattr(self, '_fallback', None) == 'say':
+            return True
+        return False
